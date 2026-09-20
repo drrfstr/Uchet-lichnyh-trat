@@ -1,0 +1,34 @@
+{{define "content"}}
+<h2>Список трат</h2>
+
+
+<form method="POST" action="/add">
+    <input type="number" step="0.01" name="amount" placeholder="Сумма" required>
+    <input type="text" name="description" placeholder="Описание" required>
+    <input type="date" name="date" required>
+    <button type="submit">Добавить</button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Описание</th>
+            <th>Сумма</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Expenses}}
+        <tr>
+            <td>{{.Date.Format "02.01.2006"}}</td>
+            <td>{{.Description}}</td>
+            <td>{{.Amount}}</td>
+        </tr>
+        {{else}}
+        <tr>
+            <td colspan="3">Трат пока нет</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
