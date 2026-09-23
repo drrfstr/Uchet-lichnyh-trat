@@ -1,13 +1,15 @@
 package main
-
 import (
     "fmt"
     "net/http"
     "project/handlers" 
+    "project/static" 
 )
 
 func main() {
- 
+    staticFS := http.FS(static.FS)
+    http.Handle("/static/", http.StripPrefix(("/static/"), http.FileServer(staticFS)))
+
     http.HandleFunc("/", handlers.Handler)
     http.HandleFunc("/about", handlers.Abouthandler)
     http.HandleFunc("/ping", handlers.Pinghandler)

@@ -10,9 +10,9 @@ import (
 	"project/templates"
 )
 
-var templates = map[string]*template.Template{
-	"index": template.Must(template.ParseFiles("templates/layout.html", "templates/index.html")),
-	"about": template.Must(template.ParseFiles("templates/layout.html", "templates/about.html")),
+var pages = map[string]*template.Template{
+	"index": template.Must(template.ParseFS(templates.FS,"layout.html", "index.html")),
+	"about": template.Must(template.ParseFS(templates.FS,"layout.html", "about.html")),
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -20,14 +20,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		"Title":    "МОИ ТРАТЫ",
 		"Expenses": models.GetExpenses(),
 	}
-	templates["index"].ExecuteTemplate(w, "layout", data)
+	pages["index"].ExecuteTemplate(w, "layout", data)
 }
 
 func Abouthandler(w http.ResponseWriter, r *http.Request) {
    data := map[string]any{
 		"Title": "О программе",
 	}
-	templates["about"].ExecuteTemplate(w, "layout", data)
+	pages["about"].ExecuteTemplate(w, "layout", data)
 }
 
 func Pinghandler(w http.ResponseWriter, r *http.Request) {
