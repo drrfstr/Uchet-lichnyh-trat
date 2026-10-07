@@ -1,0 +1,26 @@
+{{define "content"}}
+<h1>Редактирование траты</h1>
+
+<form method="POST" action="/expenses/{{.Expense.ID}}/edit">
+	<label>
+		Сумма:
+		<input type="number" name="amount" value="{{.Expense.Amount}}" required>
+	</label>
+	<br>
+
+	<label>
+		Описание:
+		<input type="text" name="description" value="{{.Expense.Description}}" required>
+	</label>
+	<br>
+
+	<label>
+		Дата:
+		<input type="date" name="date" value="{{.Expense.Date.Format "2006-01-02"}}" required>
+	</label>
+	<br>
+
+	<button type="submit">Сохранить</button>
+	<a href="/">Отмена</a>
+</form>
+{{end}}

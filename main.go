@@ -1,21 +1,29 @@
 package main
+
 import (
     "fmt"
     "net/http"
-    "project/handlers" 
-    "project/static" 
+
+    "project/handlers"
+    "project/repository"
+    "project/static"
 )
 
 func main() {
-    staticFS := http.FS(static.FS)
-    http.Handle("/static/", http.StripPrefix(("/static/"), http.FileServer(staticFS)))
+    repo := repository.NewExpenseRepository("expenses.db")
+    defer repo.Close()
 
-    http.HandleFunc("/", handlers.Handler)
-    http.HandleFunc("/about", handlers.Abouthandler)
+    h := handlers.NewHandler(repo)
+
+    http.HandleFunc("/", h.Index)
+    http.HandleFunc("/about", h.About)
     http.HandleFunc("/ping", handlers.Pinghandler)
-    http.HandleFunc("/add", handlers.AddExpenseHandler)
+    http.HandleFunc("/add", h.AddExpense)
+    http.HandleFunc("/expenses/", h.ExpenseRoutes)
 
-    fmt.Println("server is listening on port 8080...")
+    staticFS := http.FS(static.FS)
+    http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(staticFS)))
+
+    fmt.Println("server is listening on http://localhost:8080 ...")
     http.ListenAndServe(":8080", nil)
- 
 }

@@ -1,21 +1,12 @@
 package models
 
-import(
+import (
 	"time"
 )
 
 type Expense struct {
-	Amount 			int
-	Description 	string
-	Date 			time.Time
-}
-
-var Expense_list []Expense
-
-func AddExpense(expense Expense) {
-		Expense_list = append(Expense_list, expense)
-}
-
-func GetExpenses() []Expense {
-		return Expense_list
+	ID          int64     `json:"id"`
+	Amount      int       `json:"amount"`
+	Description string    `json:"description"`
+	Date        time.Time `json:"date"`
 }

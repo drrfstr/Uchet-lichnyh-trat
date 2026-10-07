@@ -1,9 +1,8 @@
 {{define "content"}}
 <h2>Список трат</h2>
 
-
 <form method="POST" action="/add">
-    <input type="number" step="0.01" name="amount" placeholder="Сумма" required>
+    <input type="number" name="amount" placeholder="Сумма" required>
     <input type="text" name="description" placeholder="Описание" required>
     <input type="date" name="date" required>
     <button type="submit">Добавить</button>
@@ -15,6 +14,7 @@
             <th>Дата</th>
             <th>Описание</th>
             <th>Сумма</th>
+            <th>Действия</th>
         </tr>
     </thead>
     <tbody>
@@ -23,10 +23,20 @@
             <td>{{.Date.Format "02.01.2006"}}</td>
             <td>{{.Description}}</td>
             <td>{{.Amount}}</td>
+            <td>
+                <a href="/expenses/{{.ID}}/edit">Редактировать</a>
+
+                <form method="POST" action="/expenses/{{.ID}}/delete" style="display:inline">
+                    <button type="submit"
+                            onclick="return confirm('Удалить эту трату?')">
+                        Удалить
+                    </button>
+                </form>
+            </td>
         </tr>
         {{else}}
         <tr>
-            <td colspan="3">Трат пока нет</td>
+            <td colspan="4">Трат пока нет</td>
         </tr>
         {{end}}
     </tbody>
