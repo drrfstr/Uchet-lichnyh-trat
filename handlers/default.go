@@ -27,6 +27,11 @@ func NewHandler(repo *repository.ExpenseRepository) *Handler {
 }
 
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+        http.NotFound(w, r)
+        return
+    }
+
 	expenses, err := h.db.GetAll()
 	if err != nil {
 		http.Error(w, "ошибка базы: "+err.Error(), http.StatusInternalServerError)
@@ -37,14 +42,21 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		"Title":    "МОИ ТРАТЫ",
 		"Expenses": expenses,
 	}
-	pages["index"].ExecuteTemplate(w, "layout", data)
+	
+	err = pages["index"].ExecuteTemplate(w, "layout", data)
+	if err != nil {
+		fmt.Printf("ExecuteTemplate error: %s", err)
+	}
 }
 
 func (h *Handler) About(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Title": "О программе",
 	}
-	pages["about"].ExecuteTemplate(w, "layout", data)
+	err := pages["about"].ExecuteTemplate(w, "layout", data)
+	if err != nil {
+		fmt.Printf("ExecuteTemplate error: %s", err)
+	}
 }
 
 func Pinghandler(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +130,10 @@ func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
 		"Title":   "Редактирование траты",
 		"Expense": expense,
 	}
-	pages["edit"].ExecuteTemplate(w, "layout", data)
+	err = pages["edit"].ExecuteTemplate(w, "layout", data)
+	if err != nil {
+		fmt.Printf("ExecuteTemplate error: %s", err)
+	}
 }
 
 func (h *Handler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
