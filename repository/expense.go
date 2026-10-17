@@ -9,6 +9,8 @@ import (
 	"project/models"
 
 	_ "modernc.org/sqlite"
+	"os"
+	"path/filepath"
 )
 
 type ExpenseRepository struct {
@@ -28,18 +30,35 @@ func NewExpenseRepository(dbPath string) *ExpenseRepository {
 	if err != nil {
 		log.Fatal("база не отвечает:", err)
 	}
-
-	createTableSQL := `
-	CREATE TABLE IF NOT EXISTS expenses (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		amount INTEGER NOT NULL,
-		description TEXT NOT NULL,
-		date DATETIME NOT NULL
-	);`
-
-	_, err = db.Exec(createTableSQL)
+	
+	dirPath := "./repository/migrations"
+	dirEntries, err := os.ReadDir(dirPath)
 	if err != nil {
-		log.Fatal("не удалось создать таблицу:", err)
+		log.Fatal("ошибка чтения папки базы данных: ", err)
+	}
+
+	for _, entry := range dirEntries {
+
+		if entry.IsDir() {
+			continue
+		}
+
+		filePath := filepath.Join(dirPath, entry.Name()) 
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			log.Printf("не удалось прочитать файл %s: %v", filePath, err)
+			continue
+		}
+
+		sql := string(content)
+
+		_, err = db.Exec(sql)
+		if err != nil {
+			log.Fatal("не удалось создать таблицу:", err)
+		}
+
+		
+
 	}
 
 	return &ExpenseRepository{db:db}
