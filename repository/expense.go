@@ -4,19 +4,21 @@ import (
 	"database/sql"
 	"errors"
 	"log"
-	"time"
+	"strings"
+
+	// "time"
 
 	"project/models"
 
-	_ "modernc.org/sqlite"
 	"os"
 	"path/filepath"
+
+	_ "modernc.org/sqlite"
 )
 
 type ExpenseRepository struct {
 	db *sql.DB
 }
-
 
 func NewExpenseRepository(dbPath string) *ExpenseRepository {
 	db, err := sql.Open("sqlite", dbPath)
@@ -24,13 +26,11 @@ func NewExpenseRepository(dbPath string) *ExpenseRepository {
 		log.Fatal("не удалось открыть базу:", err)
 	}
 
-
-
 	err = db.Ping()
 	if err != nil {
 		log.Fatal("база не отвечает:", err)
 	}
-	
+
 	dirPath := "./repository/migrations"
 	dirEntries, err := os.ReadDir(dirPath)
 	if err != nil {
@@ -43,7 +43,7 @@ func NewExpenseRepository(dbPath string) *ExpenseRepository {
 			continue
 		}
 
-		filePath := filepath.Join(dirPath, entry.Name()) 
+		filePath := filepath.Join(dirPath, entry.Name())
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			log.Printf("не удалось прочитать файл %s: %v", filePath, err)
@@ -57,17 +57,15 @@ func NewExpenseRepository(dbPath string) *ExpenseRepository {
 			log.Fatal("не удалось создать таблицу:", err)
 		}
 
-		
-
 	}
 
-	return &ExpenseRepository{db:db}
+	return &ExpenseRepository{db: db}
 }
 
-func (r *ExpenseRepository) Create(amount int, description string, date time.Time) (int64, error) {
+func (r *ExpenseRepository) CreateExpense(e models.Expense) (int64, error) {
 	result, err := r.db.Exec(
-		"INSERT INTO expenses (amount, description, date) VALUES (?, ?, ?)",
-		amount, description, date,
+		"INSERT INTO expenses (amount, description, date, category_id) VALUES (?, ?, ?, ?)",
+		e.Amount, e.Description, e.Date, e.CategoryID,
 	)
 	if err != nil {
 		return 0, err
@@ -76,7 +74,12 @@ func (r *ExpenseRepository) Create(amount int, description string, date time.Tim
 }
 
 func (r *ExpenseRepository) GetAll() ([]models.Expense, error) {
-	rows, err := r.db.Query("SELECT id, amount, description, date FROM expenses ORDER BY id")
+	rows, err := r.db.Query(`
+	SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name as category_name 
+	FROM expenses e 
+	LEFT JOIN categories c ON e.category_id = c.id 
+	ORDER BY e.id
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +88,7 @@ func (r *ExpenseRepository) GetAll() ([]models.Expense, error) {
 	var expenses []models.Expense
 	for rows.Next() {
 		var e models.Expense
-		err := rows.Scan(&e.ID, &e.Amount, &e.Description, &e.Date)
+		err := rows.Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName)
 		if err != nil {
 			return nil, err
 		}
@@ -102,9 +105,12 @@ func (r *ExpenseRepository) GetAll() ([]models.Expense, error) {
 func (r *ExpenseRepository) GetByID(id int64) (models.Expense, error) {
 	var e models.Expense
 	err := r.db.QueryRow(
-		"SELECT id, amount, description, date FROM expenses WHERE id = ?",
+		`SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name as category_name 
+	FROM expenses e 
+	LEFT JOIN categories c ON e.category_id = c.id
+	WHERE e.id = ?`,
 		id,
-	).Scan(&e.ID, &e.Amount, &e.Description, &e.Date)
+	).Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -115,10 +121,10 @@ func (r *ExpenseRepository) GetByID(id int64) (models.Expense, error) {
 	return e, nil
 }
 
-func (r *ExpenseRepository) Update(id int64, amount int, description string, date time.Time) error {
+func (r *ExpenseRepository) Update(e models.Expense) error {
 	result, err := r.db.Exec(
-		"UPDATE expenses SET amount = ?, description = ?, date = ? WHERE id = ?",
-		amount, description, date, id,
+		"UPDATE expenses SET amount = ?, description = ?, date = ?, category_id = ? WHERE id = ?",
+		e.Amount, e.Description, e.Date, e.CategoryID, e.ID,
 	)
 	if err != nil {
 		return err
@@ -152,4 +158,76 @@ func (r *ExpenseRepository) Delete(id int64) error {
 
 func (r *ExpenseRepository) Close() {
 	r.db.Close()
+}
+
+func (r *ExpenseRepository) GetAllCategories() ([]models.Category, error) {
+	rows, err := r.db.Query("SELECT id, name FROM categories ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []models.Category
+	for rows.Next() {
+		var c models.Category
+		if err := rows.Scan(&c.ID, &c.Name); err != nil {
+			return nil, err
+		}
+		categories = append(categories, c)
+	}
+	return categories, rows.Err()
+}
+
+func (r *ExpenseRepository) GetAllFiltered(categoryID int, dateFrom, dateTo string) ([]models.Expense, error) {
+	query := `
+		SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name AS category_name 
+		FROM expenses e 
+		LEFT JOIN categories c ON e.category_id = c.id
+	`
+	
+	var conditions []string
+	var args []any
+
+	if categoryID > 0 {
+		conditions = append(conditions, "e.category_id = ?")
+		args = append(args, categoryID)
+	}
+	if dateFrom != "" {
+		conditions = append(conditions, "e.date >= ?")
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		conditions = append(conditions, "e.date <= ?")
+		args = append(args, dateTo)
+	}
+
+
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	query += " ORDER BY e.id"
+
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var expenses []models.Expense
+	for rows.Next() {
+		var e models.Expense
+		err := rows.Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName)
+		if err != nil {
+			return nil, err
+		}
+		expenses = append(expenses, e)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return expenses, nil
 }

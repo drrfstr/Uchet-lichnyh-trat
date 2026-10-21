@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"project/models"
 	"project/repository"
 	"project/templates"
 )
@@ -28,21 +29,44 @@ func NewHandler(repo *repository.ExpenseRepository) *Handler {
 
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-        http.NotFound(w, r)
-        return
-    }
+		http.NotFound(w, r)
+		return
+	}
 
-	expenses, err := h.db.GetAll()
+
+	categoryStr := r.URL.Query().Get("category")
+	dateFrom := r.URL.Query().Get("from")
+	dateTo := r.URL.Query().Get("to")
+	
+
+	var categoryID int = 0
+	if categoryStr != "" {
+		if cid, err := strconv.Atoi(categoryStr); err == nil {
+			categoryID = cid
+		}
+	}
+
+	expenses, err := h.db.GetAllFiltered(categoryID, dateFrom, dateTo)
 	if err != nil {
 		http.Error(w, "ошибка базы: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	categories, err := h.db.GetAllCategories()
+	if err != nil {
+		http.Error(w, "ошибка базы: " + err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	data := map[string]any{
 		"Title":    "МОИ ТРАТЫ",
 		"Expenses": expenses,
+		"Categories": categories,
+		"CurrentCategory": categoryID,
+		"CurrentFrom":     dateFrom,
+		"CurrentTo":       dateTo,
 	}
-	
+
 	err = pages["index"].ExecuteTemplate(w, "layout", data)
 	if err != nil {
 		fmt.Printf("ExecuteTemplate error: %s", err)
@@ -89,7 +113,19 @@ func (h *Handler) AddExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.db.Create(amount, description, date)
+	category, err := strconv.Atoi(r.FormValue("category_id"))
+	if err != nil {
+		http.Error(w, "неверный id категории", http.StatusBadRequest)
+	}
+
+	newExpense := models.Expense{
+		Amount:      amount,
+		Description: description,
+		Date:        date,
+		CategoryID:  category,
+	}
+
+	_, err = h.db.CreateExpense(newExpense)
 	if err != nil {
 		http.Error(w, "ошибка базы: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -126,9 +162,16 @@ func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	categories, err := h.db.GetAllCategories()
+	if err != nil {
+		http.Error(w, "ошибка базы: " + err.Error(), http.StatusNotFound)
+		return
+	}
+
 	data := map[string]any{
 		"Title":   "Редактирование траты",
 		"Expense": expense,
+		"Categories": categories,
 	}
 	err = pages["edit"].ExecuteTemplate(w, "layout", data)
 	if err != nil {
@@ -158,7 +201,22 @@ func (h *Handler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.db.Update(id, amount, description, date)
+	category, err := strconv.Atoi(r.FormValue("category_id"))
+	if err != nil {
+		http.Error(w, "неверная категория", http.StatusBadRequest)
+		return
+	}
+
+	upd := models.Expense{
+		ID: id,
+		Amount: amount,
+		Description: description,
+		Date: date,
+		CategoryID: category,
+		
+	}
+
+	err = h.db.Update(upd)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

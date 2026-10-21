@@ -5,13 +5,38 @@
     <input type="number" name="amount" placeholder="Сумма" required>
     <input type="text" name="description" placeholder="Описание" required>
     <input type="date" name="date" required>
+    <select name="category_id" required>
+        <option value="" disabled selected>Выберите категорию</option>
+            {{range .Categories}}
+                <option value="{{.ID}}">{{.Name}}</option>
+            {{end}}
+    </select>
     <button type="submit">Добавить</button>
+</form>
+
+<form method="GET" action="/" style="margin-bottom: 20px;">
+    <span>Фильтры</span>
+    <select name="category">
+        <option value="">Все категории</option>
+        {{range .Categories}}
+            <option value="{{.ID}}" {{if eq .ID $.CurrentCategory}}selected{{end}}>
+                {{.Name}}
+            </option>
+        {{end}}
+    </select>
+
+    <label>От: <input type="date" name="from" value="{{.CurrentFrom}}"></label>
+    <label>До: <input type="date" name="to" value="{{.CurrentTo}}"></label>
+
+    <button type="submit">Фильтр</button>
+    <a href="/" style="margin-left: 10px;">Сброс</a>
 </form>
 
 <table>
     <thead>
         <tr>
             <th>Дата</th>
+            <th>Категория</th>
             <th>Описание</th>
             <th>Сумма</th>
             <th>Действия</th>
@@ -21,6 +46,7 @@
         {{range .Expenses}}
         <tr>
             <td>{{.Date.Format "02.01.2006"}}</td>
+            <td>{{.CategoryName}}</td>
             <td>{{.Description}}</td>
             <td>{{.Amount}}</td>
             <td>

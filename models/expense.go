@@ -9,4 +9,6 @@ type Expense struct {
 	Amount      int       `json:"amount"`
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`
+	CategoryID   int     `json:"category_id"`
+	CategoryName string    `json:"category_name"`
 }
