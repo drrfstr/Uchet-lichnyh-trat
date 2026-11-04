@@ -14,9 +14,11 @@ import (
 )
 
 var pages = map[string]*template.Template{
-	"index": template.Must(template.ParseFS(templates.FS, "layout.html", "index.html")),
-	"about": template.Must(template.ParseFS(templates.FS, "layout.html", "about.html")),
-	"edit":  template.Must(template.ParseFS(templates.FS, "layout.html", "edit.html")),
+	"index":    template.Must(template.ParseFS(templates.FS, "layout.html", "index.html")),
+	"about":    template.Must(template.ParseFS(templates.FS, "layout.html", "about.html")),
+	"edit":     template.Must(template.ParseFS(templates.FS, "layout.html", "edit.html")),
+	"register": template.Must(template.ParseFS(templates.FS, "layout.html", "register.html")),
+	"login":    template.Must(template.ParseFS(templates.FS, "layout.html", "login.html")),
 }
 
 type Handler struct {
@@ -33,11 +35,17 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID := getUserID(r)
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "ошибка получения пользователя", http.StatusInternalServerError)
+		return
+	}
 
 	categoryStr := r.URL.Query().Get("category")
 	dateFrom := r.URL.Query().Get("from")
 	dateTo := r.URL.Query().Get("to")
-	
 
 	var categoryID int = 0
 	if categoryStr != "" {
@@ -46,7 +54,7 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	expenses, err := h.db.GetAllFiltered(categoryID, dateFrom, dateTo)
+	expenses, err := h.db.GetAllFiltered(categoryID, dateFrom, dateTo, userID)
 	if err != nil {
 		http.Error(w, "ошибка базы: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -54,17 +62,18 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 
 	categories, err := h.db.GetAllCategories()
 	if err != nil {
-		http.Error(w, "ошибка базы: " + err.Error(), http.StatusInternalServerError)
+		http.Error(w, "ошибка базы: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	data := map[string]any{
-		"Title":    "МОИ ТРАТЫ",
-		"Expenses": expenses,
-		"Categories": categories,
+		"Title":           "МОИ ТРАТЫ",
+		"Expenses":        expenses,
+		"Categories":      categories,
 		"CurrentCategory": categoryID,
 		"CurrentFrom":     dateFrom,
 		"CurrentTo":       dateTo,
+		"User": 		   user,
 	}
 
 	err = pages["index"].ExecuteTemplate(w, "layout", data)
@@ -83,7 +92,7 @@ func (h *Handler) About(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func Pinghandler(w http.ResponseWriter, r *http.Request) {
+func PingHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "pong")
@@ -93,6 +102,8 @@ func Pinghandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AddExpense(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -123,6 +134,7 @@ func (h *Handler) AddExpense(w http.ResponseWriter, r *http.Request) {
 		Description: description,
 		Date:        date,
 		CategoryID:  category,
+		UserID: userID,
 	}
 
 	_, err = h.db.CreateExpense(newExpense)
@@ -151,12 +163,15 @@ func (h *Handler) ExpenseRoutes(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
 	id, err := parseIDFromPath(r.URL.Path, "/expenses/")
+	
+	userID := getUserID(r)
+
 	if err != nil {
 		http.Error(w, "неверный id", http.StatusBadRequest)
 		return
 	}
 
-	expense, err := h.db.GetByID(id)
+	expense, err := h.db.GetByID(id, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -164,13 +179,13 @@ func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
 
 	categories, err := h.db.GetAllCategories()
 	if err != nil {
-		http.Error(w, "ошибка базы: " + err.Error(), http.StatusNotFound)
+		http.Error(w, "ошибка базы: "+err.Error(), http.StatusNotFound)
 		return
 	}
 
 	data := map[string]any{
-		"Title":   "Редактирование траты",
-		"Expense": expense,
+		"Title":      "Редактирование траты",
+		"Expense":    expense,
 		"Categories": categories,
 	}
 	err = pages["edit"].ExecuteTemplate(w, "layout", data)
@@ -181,6 +196,8 @@ func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 	id, err := parseIDFromPath(r.URL.Path, "/expenses/")
+	userID := getUserID(r)
+
 	if err != nil {
 		http.Error(w, "неверный id", http.StatusBadRequest)
 		return
@@ -208,12 +225,12 @@ func (h *Handler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	upd := models.Expense{
-		ID: id,
-		Amount: amount,
+		ID:          id,
+		Amount:      amount,
 		Description: description,
-		Date: date,
-		CategoryID: category,
-		
+		Date:        date,
+		CategoryID:  category,
+		UserID: userID,
 	}
 
 	err = h.db.Update(upd)
@@ -227,12 +244,13 @@ func (h *Handler) UpdateExpense(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DeleteExpense(w http.ResponseWriter, r *http.Request) {
 	id, err := parseIDFromPath(r.URL.Path, "/expenses/")
+	userID := getUserID(r)
 	if err != nil {
 		http.Error(w, "неверный id", http.StatusBadRequest)
 		return
 	}
 
-	err = h.db.Delete(id)
+	err = h.db.Delete(id, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

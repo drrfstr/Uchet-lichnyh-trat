@@ -14,12 +14,24 @@ func main() {
     defer repo.Close()
 
     h := handlers.NewHandler(repo)
-
-    http.HandleFunc("/", h.Index)
+    
+    // общие
+    http.HandleFunc("/ping", handlers.PingHandler)
     http.HandleFunc("/about", h.About)
-    http.HandleFunc("/ping", handlers.Pinghandler)
-    http.HandleFunc("/add", h.AddExpense)
-    http.HandleFunc("/expenses/", h.ExpenseRoutes)
+    
+    // авторизация
+    http.HandleFunc("/register", h.RegisterHandler)
+    http.HandleFunc("/login", h.LoginHandler)
+    http.HandleFunc("/logout", h.LogoutHandler)
+
+
+    // с учеткой
+    http.HandleFunc("/", h.RequireAuth(h.Index))    
+    http.HandleFunc("/add", h.RequireAuth(h.AddExpense))
+    http.HandleFunc("/expenses/", h.RequireAuth(h.ExpenseRoutes))
+
+    
+
     
     staticFS := http.FS(static.FS)
     http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(staticFS)))

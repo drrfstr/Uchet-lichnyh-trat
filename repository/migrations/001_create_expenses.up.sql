@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS expenses (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	amount INTEGER NOT NULL,
 	category_id INTEGER NOT NULL,
-	description TEXT NOT NULL,
+	user_id INTEGER NOT NULL,
+	description TEXT,
 	date DATETIME NOT NULL
 );
+

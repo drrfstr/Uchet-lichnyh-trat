@@ -10,8 +10,14 @@
     <header>
         <h1>Учёт личных трат</h1>
         <nav>
+            {{if .User.Name}}
+                <span>{{.User.Name}} ({{.User.Email}})</span>
+            {{else}}
+                <span>Unautorized (#####)</span>
+            {{end}}
             <a href="/">Главная</a>
             <a href="/about">О программе</a>
+            <a href="/logout">Выйти</a>
         </nav>
     </header>
     <main>

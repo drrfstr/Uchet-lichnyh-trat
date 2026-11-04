@@ -62,10 +62,17 @@ func NewExpenseRepository(dbPath string) *ExpenseRepository {
 	return &ExpenseRepository{db: db}
 }
 
+func (r *ExpenseRepository) Close() {
+	r.db.Close()
+}
+
+
+
+
 func (r *ExpenseRepository) CreateExpense(e models.Expense) (int64, error) {
 	result, err := r.db.Exec(
-		"INSERT INTO expenses (amount, description, date, category_id) VALUES (?, ?, ?, ?)",
-		e.Amount, e.Description, e.Date, e.CategoryID,
+		"INSERT INTO expenses (amount, description, date, category_id, user_id) VALUES (?, ?, ?, ?, ?)",
+		e.Amount, e.Description, e.Date, e.CategoryID, e.UserID,
 	)
 	if err != nil {
 		return 0, err
@@ -75,7 +82,7 @@ func (r *ExpenseRepository) CreateExpense(e models.Expense) (int64, error) {
 
 func (r *ExpenseRepository) GetAll() ([]models.Expense, error) {
 	rows, err := r.db.Query(`
-	SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name as category_name 
+	SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name as category_name, e.user_id
 	FROM expenses e 
 	LEFT JOIN categories c ON e.category_id = c.id 
 	ORDER BY e.id
@@ -88,7 +95,7 @@ func (r *ExpenseRepository) GetAll() ([]models.Expense, error) {
 	var expenses []models.Expense
 	for rows.Next() {
 		var e models.Expense
-		err := rows.Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName)
+		err := rows.Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName, &e.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -102,15 +109,15 @@ func (r *ExpenseRepository) GetAll() ([]models.Expense, error) {
 	return expenses, nil
 }
 
-func (r *ExpenseRepository) GetByID(id int64) (models.Expense, error) {
+func (r *ExpenseRepository) GetByID(id int64, userID int) (models.Expense, error) {
 	var e models.Expense
 	err := r.db.QueryRow(
-		`SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name as category_name 
+		`SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name as category_name, e.user_id
 	FROM expenses e 
 	LEFT JOIN categories c ON e.category_id = c.id
-	WHERE e.id = ?`,
-		id,
-	).Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName)
+	WHERE e.id = ? AND user_id = ?`,
+		id, userID,
+	).Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName, &e.UserID)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -123,8 +130,8 @@ func (r *ExpenseRepository) GetByID(id int64) (models.Expense, error) {
 
 func (r *ExpenseRepository) Update(e models.Expense) error {
 	result, err := r.db.Exec(
-		"UPDATE expenses SET amount = ?, description = ?, date = ?, category_id = ? WHERE id = ?",
-		e.Amount, e.Description, e.Date, e.CategoryID, e.ID,
+		"UPDATE expenses SET amount = ?, description = ?, date = ?, category_id = ? WHERE id = ? AND user_id = ?",
+		e.Amount, e.Description, e.Date, e.CategoryID, e.ID, e.UserID,
 	)
 	if err != nil {
 		return err
@@ -140,8 +147,8 @@ func (r *ExpenseRepository) Update(e models.Expense) error {
 	return nil
 }
 
-func (r *ExpenseRepository) Delete(id int64) error {
-	result, err := r.db.Exec("DELETE FROM expenses WHERE id = ?", id)
+func (r *ExpenseRepository) Delete(id int64, userID int) error {
+	result, err := r.db.Exec("DELETE FROM expenses WHERE id = ? AND user_id = ?", id, userID)
 	if err != nil {
 		return err
 	}
@@ -156,9 +163,8 @@ func (r *ExpenseRepository) Delete(id int64) error {
 	return nil
 }
 
-func (r *ExpenseRepository) Close() {
-	r.db.Close()
-}
+
+
 
 func (r *ExpenseRepository) GetAllCategories() ([]models.Category, error) {
 	rows, err := r.db.Query("SELECT id, name FROM categories ORDER BY id")
@@ -178,15 +184,15 @@ func (r *ExpenseRepository) GetAllCategories() ([]models.Category, error) {
 	return categories, rows.Err()
 }
 
-func (r *ExpenseRepository) GetAllFiltered(categoryID int, dateFrom, dateTo string) ([]models.Expense, error) {
+func (r *ExpenseRepository) GetAllFiltered(categoryID int, dateFrom, dateTo string, userID int) ([]models.Expense, error) {
 	query := `
-		SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name AS category_name 
+		SELECT e.id, e.amount, e.description, e.date, e.category_id, c.name AS category_name, e.user_id
 		FROM expenses e 
 		LEFT JOIN categories c ON e.category_id = c.id
 	`
 	
-	var conditions []string
-	var args []any
+	conditions := []string{"e.user_id = ?"}
+	args := []any{userID}
 
 	if categoryID > 0 {
 		conditions = append(conditions, "e.category_id = ?")
@@ -218,7 +224,7 @@ func (r *ExpenseRepository) GetAllFiltered(categoryID int, dateFrom, dateTo stri
 	var expenses []models.Expense
 	for rows.Next() {
 		var e models.Expense
-		err := rows.Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName)
+		err := rows.Scan(&e.ID, &e.Amount, &e.Description, &e.Date, &e.CategoryID, &e.CategoryName, &e.UserID)
 		if err != nil {
 			return nil, err
 		}

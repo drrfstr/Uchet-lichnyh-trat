@@ -11,4 +11,5 @@ type Expense struct {
 	Date        time.Time `json:"date"`
 	CategoryID   int     `json:"category_id"`
 	CategoryName string    `json:"category_name"`
+	UserID       int `json:"user_id"`
 }
