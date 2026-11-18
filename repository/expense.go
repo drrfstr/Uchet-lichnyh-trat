@@ -237,3 +237,79 @@ func (r *ExpenseRepository) GetAllFiltered(categoryID int, dateFrom, dateTo stri
 
 	return expenses, nil
 }
+
+func (r *ExpenseRepository) GetStatsByCategory(userID int, dateFrom, dateTo string) ([]models.CategoryStat, error) {
+	query := `
+		SELECT c.name, SUM(e.amount) AS total
+		FROM expenses e
+		LEFT JOIN categories c ON e.category_id = c.id
+		WHERE e.user_id = ?
+	`
+	var args []any
+	args = append(args, userID)
+
+	if dateFrom != "" {
+		query += " AND e.date >= ?"
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		query += " AND e.date <= ?"
+		args = append(args, dateTo)
+	}
+
+	query += " GROUP BY c.name ORDER BY total DESC"
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stats := make([]models.CategoryStat, 0)
+	for rows.Next() {
+		var s models.CategoryStat
+		if err := rows.Scan(&s.Name, &s.Total); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}
+
+
+func (r *ExpenseRepository) GetStatsByMonth(userID int, dateFrom, dateTo string) ([]models.MonthStat, error) {
+	query := `
+		SELECT substr(date, 1, 7) AS month, SUM(amount) AS total
+		FROM expenses
+		WHERE user_id = ?
+	`
+	var args []any
+	args = append(args, userID)
+
+	if dateFrom != "" {
+		query += " AND date >= ?"
+		args = append(args, dateFrom)
+	}
+	if dateTo != "" {
+		query += " AND date <= ?"
+		args = append(args, dateTo)
+	}
+
+	query += " GROUP BY 1 ORDER BY 1 ASC"
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stats := make([]models.MonthStat, 0)
+	for rows.Next() {
+		var s models.MonthStat
+		if err := rows.Scan(&s.Month, &s.Total); err != nil {
+			return nil, err
+		}
+		stats = append(stats, s)
+	}
+	return stats, rows.Err()
+}

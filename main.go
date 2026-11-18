@@ -29,6 +29,11 @@ func main() {
     http.HandleFunc("/", h.RequireAuth(h.Index))    
     http.HandleFunc("/add", h.RequireAuth(h.AddExpense))
     http.HandleFunc("/expenses/", h.RequireAuth(h.ExpenseRoutes))
+   
+    http.HandleFunc("/api/stats/by-category", h.RequireAuth(h.APIStatsByCategory))
+    http.HandleFunc("/api/stats/by-month", h.RequireAuth(h.APIStatsByMonth))
+
+    http.HandleFunc("/stats", h.RequireAuth(h.StatsPage)) 
 
     
 

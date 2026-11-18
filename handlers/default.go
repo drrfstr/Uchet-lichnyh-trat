@@ -19,6 +19,7 @@ var pages = map[string]*template.Template{
 	"edit":     template.Must(template.ParseFS(templates.FS, "layout.html", "edit.html")),
 	"register": template.Must(template.ParseFS(templates.FS, "layout.html", "register.html")),
 	"login":    template.Must(template.ParseFS(templates.FS, "layout.html", "login.html")),
+	"stats": 	template.Must(template.ParseFS(templates.FS, "layout.html", "stats.html")),
 }
 
 type Handler struct {
@@ -265,4 +266,19 @@ func parseIDFromPath(path, prefix string) (int64, error) {
 		raw = raw[:i]
 	}
 	return strconv.ParseInt(raw, 10, 64)
+}
+
+func (h *Handler) StatsPage(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "ошибка получения пользователя", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]any{
+		"Title": "Статистика",
+		"User":  user,
+	}
+	pages["stats"].ExecuteTemplate(w, "layout", data)
 }

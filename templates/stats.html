@@ -1,0 +1,87 @@
+{{define "content"}}
+<h2>Статистика</h2>
+
+<div style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd;">
+    <label>От: <input type="date" id="date-from"></label>
+    <label>До: <input type="date" id="date-to"></label>
+    <button onclick="loadStats()">Применить</button>
+    <button onclick="resetStats()">Сбросить</button>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 40px; justify-content: center;">
+    <div style="width: 400px; height: 400px;">
+        <canvas id="categoryChart"></canvas>
+    </div>
+    <div style="width: 500px; height: 400px;">
+        <canvas id="monthChart"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let catChartInstance = null;
+    let monChartInstance = null;
+
+    function loadStats() {
+        const from = document.getElementById('date-from').value;
+        const to = document.getElementById('date-to').value;
+
+        fetch(`/api/stats/by-category?from=${from}&to=${to}`)
+            .then(res => res.json())
+            .then(data => {
+                const labels = data.map(item => item.name);
+                const totals = data.map(item => item.total);
+
+                if (catChartInstance) catChartInstance.destroy(); 
+                
+                const ctx = document.getElementById('categoryChart').getContext('2d');
+                catChartInstance = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels.length ? labels : ["Нет данных"],
+                        datasets: [{
+                            data: totals.length ? totals : [1],
+                            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+                        }]
+                    },
+                    options: { plugins: { title: { display: true, text: 'Траты по категориям' } } }
+                });
+            });
+
+        fetch(`/api/stats/by-month?from=${from}&to=${to}`)
+            .then(res => res.json())
+            .then(data => {
+                const monthNames = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+                const labels = data.map(item => {
+                    const [year, month] = item.month.split('-');
+                    return `${monthNames[parseInt(month) - 1]} ${year}`;
+                });
+                const totals = data.map(item => item.total);
+
+                if (monChartInstance) monChartInstance.destroy(); 
+
+                const ctx = document.getElementById('monthChart').getContext('2d');
+                monChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels.length ? labels : ["Нет данных"],
+                        datasets: [{
+                            label: 'Сумма (руб)',
+                            data: totals.length ? totals : [0],
+                            backgroundColor: '#36A2EB'
+                        }]
+                    },
+                    options: { plugins: { title: { display: true, text: 'Траты по месяцам' } } }
+                });
+            });
+    }
+
+    function resetStats() {
+        document.getElementById('date-from').value = '';
+        document.getElementById('date-to').value = '';
+        loadStats();
+    }
+
+    loadStats();
+</script>
+{{end}}
